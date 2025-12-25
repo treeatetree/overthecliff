@@ -2,6 +2,7 @@ import { ReactNode } from 'react';
 import BottomNav from './BottomNav';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { GlobalSearch } from '@/components/search/GlobalSearch';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -18,7 +19,8 @@ const AppLayout = ({ children, title }: AppLayoutProps) => {
           ) : (
             <div />
           )}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <GlobalSearch />
             <NotificationBell />
             <ThemeToggle />
           </div>
