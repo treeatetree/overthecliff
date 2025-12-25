@@ -1,13 +1,19 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useEvents } from '@/hooks/useEvents';
+import { useContacts } from '@/hooks/useContacts';
 import AppLayout from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar, Users, Gift, Bell, Sparkles } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { format, differenceInDays, parseISO, isSameDay, addDays } from 'date-fns';
+import { zhCN } from 'date-fns/locale';
 
 const Index = () => {
   const { user, loading } = useAuth();
+  const { events, loading: eventsLoading } = useEvents();
+  const { contacts, loading: contactsLoading } = useContacts();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -15,6 +21,43 @@ const Index = () => {
       navigate('/auth');
     }
   }, [user, loading, navigate]);
+
+  const todayEvents = useMemo(() => {
+    const today = new Date();
+    return events.filter(event => isSameDay(parseISO(event.event_date), today));
+  }, [events]);
+
+  const upcomingBirthdays = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const nextWeek = addDays(today, 30);
+    
+    return contacts
+      .filter(contact => {
+        if (!contact.birthday) return false;
+        const birthday = parseISO(contact.birthday);
+        // Get this year's birthday
+        const thisYearBirthday = new Date(today.getFullYear(), birthday.getMonth(), birthday.getDate());
+        // If already passed, check next year
+        if (thisYearBirthday < today) {
+          thisYearBirthday.setFullYear(today.getFullYear() + 1);
+        }
+        return thisYearBirthday <= nextWeek;
+      })
+      .map(contact => {
+        const birthday = parseISO(contact.birthday!);
+        const thisYearBirthday = new Date(today.getFullYear(), birthday.getMonth(), birthday.getDate());
+        if (thisYearBirthday < today) {
+          thisYearBirthday.setFullYear(today.getFullYear() + 1);
+        }
+        return {
+          ...contact,
+          daysUntil: differenceInDays(thisYearBirthday, today),
+        };
+      })
+      .sort((a, b) => a.daysUntil - b.daysUntil)
+      .slice(0, 5);
+  }, [contacts]);
 
   if (loading) {
     return (
@@ -28,16 +71,7 @@ const Index = () => {
     return null;
   }
 
-  // Mock data for now
-  const todayEvents = [
-    { id: 1, title: '团队周会', time: '10:00', type: 'meeting' },
-    { id: 2, title: '午餐约会 - 小明', time: '12:30', type: 'social' },
-  ];
-
-  const upcomingBirthdays = [
-    { id: 1, name: '妈妈', days: 3 },
-    { id: 2, name: '小红', days: 7 },
-  ];
+  const isDataLoading = eventsLoading || contactsLoading;
 
   return (
     <AppLayout title="今天">
@@ -46,7 +80,9 @@ const Index = () => {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-foreground">你好！</h2>
-            <p className="text-muted-foreground">今天是美好的一天</p>
+            <p className="text-muted-foreground">
+              {format(new Date(), 'M月d日 EEEE', { locale: zhCN })}
+            </p>
           </div>
           <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
             <Sparkles className="h-6 w-6 text-primary" />
@@ -62,16 +98,26 @@ const Index = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {todayEvents.length > 0 ? (
+            {isDataLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+            ) : todayEvents.length > 0 ? (
               todayEvents.map((event) => (
                 <div
                   key={event.id}
-                  className="flex items-center gap-3 p-3 rounded-lg bg-muted/50"
+                  className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors"
+                  onClick={() => navigate('/events')}
                 >
                   <div className="h-2 w-2 rounded-full bg-primary" />
                   <div className="flex-1">
                     <p className="font-medium text-foreground">{event.title}</p>
-                    <p className="text-sm text-muted-foreground">{event.time}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {event.event_type === 'birthday' ? '生日' : 
+                       event.event_type === 'anniversary' ? '纪念日' : 
+                       event.event_type === 'meeting' ? '会面' : '事件'}
+                    </p>
                   </div>
                 </div>
               ))
@@ -92,46 +138,69 @@ const Index = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {upcomingBirthdays.map((birthday) => (
-              <div
-                key={birthday.id}
-                className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Users className="h-4 w-4 text-primary" />
-                  </div>
-                  <span className="font-medium text-foreground">{birthday.name}</span>
-                </div>
-                <span className="text-sm text-muted-foreground">
-                  {birthday.days}天后
-                </span>
+            {isDataLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
               </div>
-            ))}
+            ) : upcomingBirthdays.length > 0 ? (
+              upcomingBirthdays.map((contact) => (
+                <div
+                  key={contact.id}
+                  className="flex items-center justify-between p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors"
+                  onClick={() => navigate('/contacts')}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Users className="h-4 w-4 text-primary" />
+                    </div>
+                    <div>
+                      <span className="font-medium text-foreground">{contact.name}</span>
+                      {contact.relationship && (
+                        <p className="text-xs text-muted-foreground">{contact.relationship}</p>
+                      )}
+                    </div>
+                  </div>
+                  <span className={`text-sm ${contact.daysUntil <= 3 ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
+                    {contact.daysUntil === 0 ? '今天' : `${contact.daysUntil}天后`}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <p className="text-muted-foreground text-center py-4">
+                暂无即将到来的生日
+              </p>
+            )}
           </CardContent>
         </Card>
 
         {/* Quick Actions */}
         <div className="grid grid-cols-2 gap-3">
-          <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
+          <Card 
+            className="cursor-pointer hover:bg-muted/50 transition-colors"
+            onClick={() => navigate('/events')}
+          >
             <CardContent className="p-4 flex items-center gap-3">
               <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
                 <Bell className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <p className="font-medium text-foreground">提醒</p>
-                <p className="text-xs text-muted-foreground">2个待处理</p>
+                <p className="font-medium text-foreground">事件</p>
+                <p className="text-xs text-muted-foreground">{events.length}个</p>
               </div>
             </CardContent>
           </Card>
-          <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
+          <Card 
+            className="cursor-pointer hover:bg-muted/50 transition-colors"
+            onClick={() => navigate('/assistant')}
+          >
             <CardContent className="p-4 flex items-center gap-3">
               <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
                 <Sparkles className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <p className="font-medium text-foreground">AI 建议</p>
-                <p className="text-xs text-muted-foreground">查看分析</p>
+                <p className="font-medium text-foreground">AI 助手</p>
+                <p className="text-xs text-muted-foreground">获取建议</p>
               </div>
             </CardContent>
           </Card>
