@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useToast } from './use-toast';
+import { useBirthdaySync } from './useBirthdaySync';
 
 export interface Contact {
   id: string;
@@ -24,6 +25,7 @@ export const useContacts = () => {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
+  const { syncBirthdayEvent, deleteBirthdayEvent } = useBirthdaySync();
 
   const fetchContacts = async () => {
     if (!user) return;
@@ -61,6 +63,12 @@ export const useContacts = () => {
       
       setContacts(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
       toast({ title: '联系人已添加' });
+      
+      // Auto-create birthday event if birthday is set
+      if (data.birthday) {
+        await syncBirthdayEvent(user.id, data.id, data.name, data.birthday);
+      }
+      
       return data;
     } catch (error: any) {
       toast({
@@ -73,7 +81,11 @@ export const useContacts = () => {
   };
 
   const updateContact = async (id: string, updates: Partial<ContactInsert>) => {
+    if (!user) return null;
+    
     try {
+      const oldContact = contacts.find(c => c.id === id);
+      
       const { data, error } = await supabase
         .from('contacts')
         .update(updates)
@@ -85,6 +97,12 @@ export const useContacts = () => {
       
       setContacts(prev => prev.map(c => c.id === id ? data : c));
       toast({ title: '联系人已更新' });
+      
+      // Sync birthday event if birthday changed
+      if (oldContact?.birthday !== data.birthday || oldContact?.name !== data.name) {
+        await syncBirthdayEvent(user.id, data.id, data.name, data.birthday, oldContact?.birthday);
+      }
+      
       return data;
     } catch (error: any) {
       toast({
@@ -98,6 +116,9 @@ export const useContacts = () => {
 
   const deleteContact = async (id: string) => {
     try {
+      // Delete associated birthday event first
+      await deleteBirthdayEvent(id);
+      
       const { error } = await supabase
         .from('contacts')
         .delete()
