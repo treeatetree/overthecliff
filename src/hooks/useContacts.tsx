@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useToast } from './use-toast';
-import { useBirthdaySync } from './useBirthdaySync';
+import { syncBirthdayEvent, deleteBirthdayEvent } from './useBirthdaySync';
 
 export interface Contact {
   id: string;
@@ -25,7 +25,6 @@ export const useContacts = () => {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
-  const { syncBirthdayEvent, deleteBirthdayEvent } = useBirthdaySync();
 
   const fetchContacts = async () => {
     if (!user) return;
@@ -66,7 +65,10 @@ export const useContacts = () => {
       
       // Auto-create birthday event if birthday is set
       if (data.birthday) {
-        await syncBirthdayEvent(user.id, data.id, data.name, data.birthday);
+        const created = await syncBirthdayEvent(user.id, data.id, data.name, data.birthday);
+        if (created) {
+          toast({ title: `已为${data.name}创建生日提醒` });
+        }
       }
       
       return data;
