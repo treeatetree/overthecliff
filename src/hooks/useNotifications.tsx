@@ -2,14 +2,48 @@ import { useEffect, useCallback, useState } from 'react';
 import { useEvents, Event } from './useEvents';
 import { useContacts } from './useContacts';
 import { useToast } from './use-toast';
-import { differenceInDays, parseISO, format } from 'date-fns';
+import { differenceInDays, parseISO, format, addWeeks, addMonths, addYears, isBefore, isAfter } from 'date-fns';
+
+// Calculate next occurrence for recurring events
+const getNextOccurrence = (event: Event, today: Date): Date => {
+  const eventDate = parseISO(event.event_date);
+  
+  if (!event.is_recurring || !event.recurring_type) {
+    return eventDate;
+  }
+
+  let nextDate = new Date(eventDate);
+  
+  // Find the next occurrence that is on or after today
+  while (isBefore(nextDate, today)) {
+    switch (event.recurring_type) {
+      case 'weekly':
+        nextDate = addWeeks(nextDate, 1);
+        break;
+      case 'monthly':
+        nextDate = addMonths(nextDate, 1);
+        break;
+      case 'yearly':
+        nextDate = addYears(nextDate, 1);
+        break;
+      default:
+        return eventDate;
+    }
+  }
+  
+  return nextDate;
+};
+
+export interface EventWithNextDate extends Event {
+  nextOccurrence: Date;
+}
 
 export const useNotifications = () => {
   const { events } = useEvents();
   const { contacts } = useContacts();
   const { toast } = useToast();
   const [permission, setPermission] = useState<NotificationPermission>('default');
-  const [upcomingReminders, setUpcomingReminders] = useState<Event[]>([]);
+  const [upcomingReminders, setUpcomingReminders] = useState<EventWithNextDate[]>([]);
 
   // Check notification permission
   useEffect(() => {
@@ -69,29 +103,29 @@ export const useNotifications = () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const reminders = events.filter(event => {
-      const eventDate = parseISO(event.event_date);
-      eventDate.setHours(0, 0, 0, 0);
-      const daysUntil = differenceInDays(eventDate, today);
-      const reminderDays = event.reminder_days ?? 7;
-      
-      // Include events that are within reminder period (including today)
-      return daysUntil >= 0 && daysUntil <= reminderDays;
-    }).sort((a, b) => 
-      new Date(a.event_date).getTime() - new Date(b.event_date).getTime()
-    );
+    const reminders = events
+      .map(event => {
+        const nextOccurrence = getNextOccurrence(event, today);
+        return { ...event, nextOccurrence };
+      })
+      .filter(event => {
+        const daysUntil = differenceInDays(event.nextOccurrence, today);
+        const reminderDays = event.reminder_days ?? 7;
+        
+        // Include events that are within reminder period (including today)
+        return daysUntil >= 0 && daysUntil <= reminderDays;
+      })
+      .sort((a, b) => a.nextOccurrence.getTime() - b.nextOccurrence.getTime());
 
     setUpcomingReminders(reminders);
   }, [events]);
 
   // Show in-app reminder toast
-  const showInAppReminder = useCallback((event: Event) => {
-    const eventDate = parseISO(event.event_date);
+  const showInAppReminder = useCallback((event: EventWithNextDate) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    eventDate.setHours(0, 0, 0, 0);
     
-    const daysUntil = differenceInDays(eventDate, today);
+    const daysUntil = differenceInDays(event.nextOccurrence, today);
     const contactName = getContactName(event.contact_id);
     
     let timeText = '';
@@ -103,9 +137,13 @@ export const useNotifications = () => {
       timeText = `${daysUntil}天后`;
     }
 
+    const recurringText = event.is_recurring 
+      ? ` (${event.recurring_type === 'weekly' ? '每周' : event.recurring_type === 'monthly' ? '每月' : '每年'})`
+      : '';
+
     const description = contactName 
-      ? `${timeText} - ${format(eventDate, 'MM月dd日')} - ${contactName}`
-      : `${timeText} - ${format(eventDate, 'MM月dd日')}`;
+      ? `${timeText} - ${format(event.nextOccurrence, 'MM月dd日')}${recurringText} - ${contactName}`
+      : `${timeText} - ${format(event.nextOccurrence, 'MM月dd日')}${recurringText}`;
 
     toast({
       title: `📅 ${event.title}`,
@@ -114,13 +152,11 @@ export const useNotifications = () => {
   }, [getContactName, toast]);
 
   // Show browser notification for event
-  const showBrowserNotification = useCallback((event: Event) => {
-    const eventDate = parseISO(event.event_date);
+  const showBrowserNotification = useCallback((event: EventWithNextDate) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    eventDate.setHours(0, 0, 0, 0);
     
-    const daysUntil = differenceInDays(eventDate, today);
+    const daysUntil = differenceInDays(event.nextOccurrence, today);
     const contactName = getContactName(event.contact_id);
     
     let timeText = '';
@@ -132,9 +168,13 @@ export const useNotifications = () => {
       timeText = `${daysUntil}天后`;
     }
 
+    const recurringText = event.is_recurring 
+      ? ` [${event.recurring_type === 'weekly' ? '每周' : event.recurring_type === 'monthly' ? '每月' : '每年'}]`
+      : '';
+
     const body = contactName 
-      ? `${timeText} (${format(eventDate, 'MM月dd日')}) - 关联: ${contactName}`
-      : `${timeText} (${format(eventDate, 'MM月dd日')})`;
+      ? `${timeText} (${format(event.nextOccurrence, 'MM月dd日')})${recurringText} - ${contactName}`
+      : `${timeText} (${format(event.nextOccurrence, 'MM月dd日')})${recurringText}`;
 
     sendNotification(event.title, body);
   }, [getContactName, sendNotification]);

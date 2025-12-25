@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bell, BellRing, Calendar, User } from 'lucide-react';
+import { Bell, BellRing, Calendar, User, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Popover,
@@ -8,9 +8,9 @@ import {
 } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { useNotifications } from '@/hooks/useNotifications';
+import { useNotifications, EventWithNextDate } from '@/hooks/useNotifications';
 import { useContacts } from '@/hooks/useContacts';
-import { format, parseISO, differenceInDays } from 'date-fns';
+import { format, differenceInDays } from 'date-fns';
 
 export const NotificationBell = () => {
   const [open, setOpen] = useState(false);
@@ -22,10 +22,10 @@ export const NotificationBell = () => {
     return contacts.find(c => c.id === contactId)?.name || null;
   };
 
-  const getDaysUntil = (dateStr: string) => {
-    const eventDate = parseISO(dateStr);
+  const getDaysUntil = (date: Date) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const eventDate = new Date(date);
     eventDate.setHours(0, 0, 0, 0);
     return differenceInDays(eventDate, today);
   };
@@ -34,6 +34,16 @@ export const NotificationBell = () => {
     if (daysUntil === 0) return '今天';
     if (daysUntil === 1) return '明天';
     return `${daysUntil}天后`;
+  };
+
+  const getRecurringLabel = (event: EventWithNextDate) => {
+    if (!event.is_recurring) return null;
+    switch (event.recurring_type) {
+      case 'weekly': return '每周';
+      case 'monthly': return '每月';
+      case 'yearly': return '每年';
+      default: return null;
+    }
   };
 
   const hasReminders = upcomingReminders.length > 0;
@@ -82,10 +92,11 @@ export const NotificationBell = () => {
           {hasReminders ? (
             <div className="p-2 space-y-2">
               {upcomingReminders.map(event => {
-                const daysUntil = getDaysUntil(event.event_date);
+                const daysUntil = getDaysUntil(event.nextOccurrence);
                 const contactName = getContactName(event.contact_id);
                 const isToday = daysUntil === 0;
                 const isTomorrow = daysUntil === 1;
+                const recurringLabel = getRecurringLabel(event);
 
                 return (
                   <div 
@@ -103,12 +114,18 @@ export const NotificationBell = () => {
                         <p className="font-medium truncate">{event.title}</p>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                           <Calendar className="h-3 w-3" />
-                          <span>{format(parseISO(event.event_date), 'MM月dd日')}</span>
+                          <span>{format(event.nextOccurrence, 'MM月dd日')}</span>
                         </div>
                         {contactName && (
                           <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                             <User className="h-3 w-3" />
                             <span>{contactName}</span>
+                          </div>
+                        )}
+                        {recurringLabel && (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                            <RefreshCw className="h-3 w-3" />
+                            <span>{recurringLabel}重复</span>
                           </div>
                         )}
                       </div>

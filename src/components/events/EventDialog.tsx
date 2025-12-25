@@ -26,6 +26,12 @@ const EVENT_TYPES = [
   { value: 'other', label: '其他' },
 ];
 
+const RECURRING_TYPES = [
+  { value: 'weekly', label: '每周', icon: '📅' },
+  { value: 'monthly', label: '每月', icon: '📆' },
+  { value: 'yearly', label: '每年', icon: '🔄' },
+];
+
 export const EventDialog = ({ open, onOpenChange, event, contacts, onSave, defaultDate }: EventDialogProps) => {
   const [formData, setFormData] = useState<EventInsert>({
     contact_id: null,
@@ -161,17 +167,40 @@ export const EventDialog = ({ open, onOpenChange, event, contacts, onSave, defau
             />
           </div>
 
-          <div className="flex items-center justify-between py-2">
-            <Label htmlFor="recurring">每年重复</Label>
-            <Switch
-              id="recurring"
-              checked={formData.is_recurring || false}
-              onCheckedChange={(checked) => setFormData(prev => ({ 
-                ...prev, 
-                is_recurring: checked,
-                recurring_type: checked ? 'yearly' : null
-              }))}
-            />
+          <div className="space-y-3 py-2 border rounded-lg p-3">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="recurring">重复事件</Label>
+              <Switch
+                id="recurring"
+                checked={formData.is_recurring || false}
+                onCheckedChange={(checked) => setFormData(prev => ({ 
+                  ...prev, 
+                  is_recurring: checked,
+                  recurring_type: checked ? 'yearly' : null
+                }))}
+              />
+            </div>
+            
+            {formData.is_recurring && (
+              <div className="space-y-2">
+                <Label>重复频率</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {RECURRING_TYPES.map(type => (
+                    <Button
+                      key={type.value}
+                      type="button"
+                      variant={formData.recurring_type === type.value ? 'default' : 'outline'}
+                      size="sm"
+                      className="w-full"
+                      onClick={() => setFormData(prev => ({ ...prev, recurring_type: type.value }))}
+                    >
+                      <span className="mr-1">{type.icon}</span>
+                      {type.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
