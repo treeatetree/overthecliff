@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import BottomNav from './BottomNav';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -17,7 +18,10 @@ const AppLayout = ({ children, title }: AppLayoutProps) => {
           ) : (
             <div />
           )}
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <NotificationBell />
+            <ThemeToggle />
+          </div>
         </div>
       </header>
       <main className="max-w-lg mx-auto pb-20">
