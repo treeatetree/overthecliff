@@ -4,7 +4,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Contact, ContactInsert } from '@/hooks/useContacts';
+import { RELATIONSHIP_GROUPS } from '@/lib/contactGroups';
 
 interface ContactDialogProps {
   open: boolean;
@@ -84,13 +92,25 @@ export const ContactDialog = ({ open, onOpenChange, contact, onSave }: ContactDi
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="relationship">关系</Label>
-            <Input
-              id="relationship"
+            <Label htmlFor="relationship">分组</Label>
+            <Select
               value={formData.relationship || ''}
-              onChange={(e) => setFormData(prev => ({ ...prev, relationship: e.target.value }))}
-              placeholder="如：朋友、同事、家人"
-            />
+              onValueChange={(value) => setFormData(prev => ({ ...prev, relationship: value }))}
+            >
+              <SelectTrigger id="relationship">
+                <SelectValue placeholder="选择分组" />
+              </SelectTrigger>
+              <SelectContent>
+                {RELATIONSHIP_GROUPS.map(group => (
+                  <SelectItem key={group.value} value={group.value}>
+                    <span className="flex items-center gap-2">
+                      <span>{group.icon}</span>
+                      <span>{group.label}</span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
