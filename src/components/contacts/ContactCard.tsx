@@ -2,6 +2,7 @@ import { Contact } from '@/hooks/useContacts';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Phone, Mail, Cake, MoreVertical, Pencil, Trash2 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -10,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { format } from 'date-fns';
+import { getGroupLabel, getGroupIcon } from '@/lib/contactGroups';
 
 interface ContactCardProps {
   contact: Contact;
@@ -43,7 +45,10 @@ export const ContactCard = ({ contact, onEdit, onDelete }: ContactCardProps) => 
               <div>
                 <h3 className="font-medium truncate">{contact.name}</h3>
                 {contact.relationship && (
-                  <p className="text-sm text-muted-foreground">{contact.relationship}</p>
+                  <Badge variant="secondary" className="mt-1 text-xs gap-1">
+                    <span>{getGroupIcon(contact.relationship)}</span>
+                    <span>{getGroupLabel(contact.relationship)}</span>
+                  </Badge>
                 )}
               </div>
               
