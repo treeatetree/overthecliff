@@ -1,20 +1,27 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useEvents } from '@/hooks/useEvents';
-import { useContacts } from '@/hooks/useContacts';
+import { useContacts, ContactInsert } from '@/hooks/useContacts';
 import AppLayout from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar, Users, Gift, Bell, Sparkles } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, differenceInDays, parseISO, isSameDay, addDays } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
+import { QuickActionButton } from '@/components/quick-actions/QuickActionButton';
+import { ContactDialog } from '@/components/contacts/ContactDialog';
+import { EventDialog } from '@/components/events/EventDialog';
+import { EventInsert } from '@/hooks/useEvents';
 
 const Index = () => {
   const { user, loading } = useAuth();
-  const { events, loading: eventsLoading } = useEvents();
-  const { contacts, loading: contactsLoading } = useContacts();
+  const { events, loading: eventsLoading, addEvent } = useEvents();
+  const { contacts, loading: contactsLoading, addContact } = useContacts();
   const navigate = useNavigate();
+  
+  const [contactDialogOpen, setContactDialogOpen] = useState(false);
+  const [eventDialogOpen, setEventDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -58,6 +65,14 @@ const Index = () => {
       .sort((a, b) => a.daysUntil - b.daysUntil)
       .slice(0, 5);
   }, [contacts]);
+
+  const handleSaveContact = async (data: ContactInsert) => {
+    return addContact(data);
+  };
+
+  const handleSaveEvent = async (data: EventInsert) => {
+    return addEvent(data);
+  };
 
   if (loading) {
     return (
@@ -206,6 +221,27 @@ const Index = () => {
           </Card>
         </div>
       </div>
+
+      {/* Quick Action FAB */}
+      <QuickActionButton
+        onAddContact={() => setContactDialogOpen(true)}
+        onAddEvent={() => setEventDialogOpen(true)}
+      />
+
+      {/* Dialogs */}
+      <ContactDialog
+        open={contactDialogOpen}
+        onOpenChange={setContactDialogOpen}
+        onSave={handleSaveContact}
+      />
+
+      <EventDialog
+        open={eventDialogOpen}
+        onOpenChange={setEventDialogOpen}
+        contacts={contacts}
+        onSave={handleSaveEvent}
+        defaultDate={new Date()}
+      />
     </AppLayout>
   );
 };
