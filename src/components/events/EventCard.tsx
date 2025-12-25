@@ -93,7 +93,8 @@ export const EventCard = ({ event, contact, onEdit, onDelete }: EventCardProps) 
               {event.is_recurring && (
                 <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-muted">
                   <RefreshCw className="h-3 w-3" />
-                  每年重复
+                  {event.recurring_type === 'weekly' ? '每周' : 
+                   event.recurring_type === 'monthly' ? '每月' : '每年'}重复
                 </span>
               )}
               {contact && (
