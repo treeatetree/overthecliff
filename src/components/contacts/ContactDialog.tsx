@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Camera, Loader2 } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -13,6 +15,8 @@ import {
 } from '@/components/ui/select';
 import { Contact, ContactInsert } from '@/hooks/useContacts';
 import { RELATIONSHIP_GROUPS } from '@/lib/contactGroups';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface ContactDialogProps {
   open: boolean;
@@ -32,6 +36,9 @@ export const ContactDialog = ({ open, onOpenChange, contact, onSave }: ContactDi
     avatar_url: '',
   });
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (contact) {
@@ -57,6 +64,60 @@ export const ContactDialog = ({ open, onOpenChange, contact, onSave }: ContactDi
     }
   }, [contact, open]);
 
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: '请选择图片文件',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        title: '图片大小不能超过2MB',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setUploading(true);
+    try {
+      // Generate unique filename
+      const fileExt = file.name.split('.').pop();
+      const fileName = `contact-${Date.now()}.${fileExt}`;
+      const filePath = `contacts/${fileName}`;
+
+      // Upload to Supabase storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      setFormData(prev => ({ ...prev, avatar_url: publicUrl }));
+      toast({ title: '头像上传成功' });
+    } catch (error: any) {
+      toast({
+        title: '上传失败',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) return;
@@ -73,6 +134,10 @@ export const ContactDialog = ({ open, onOpenChange, contact, onSave }: ContactDi
     }
   };
 
+  const getInitials = (name: string) => {
+    return name.slice(0, 2).toUpperCase() || '联系';
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
@@ -80,6 +145,39 @@ export const ContactDialog = ({ open, onOpenChange, contact, onSave }: ContactDi
           <DialogTitle>{contact ? '编辑联系人' : '添加联系人'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Avatar Upload */}
+          <div className="flex justify-center">
+            <div className="relative">
+              <Avatar className="h-20 w-20">
+                <AvatarImage src={formData.avatar_url || ''} />
+                <AvatarFallback className="bg-primary/10 text-primary text-xl font-medium">
+                  {getInitials(formData.name)}
+                </AvatarFallback>
+              </Avatar>
+              <Button
+                type="button"
+                size="icon"
+                variant="secondary"
+                className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full shadow"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+              >
+                {uploading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Camera className="h-4 w-4" />
+                )}
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleAvatarUpload}
+              />
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="name">姓名 *</Label>
             <Input
@@ -161,7 +259,7 @@ export const ContactDialog = ({ open, onOpenChange, contact, onSave }: ContactDi
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
               取消
             </Button>
-            <Button type="submit" disabled={saving || !formData.name.trim()} className="flex-1">
+            <Button type="submit" disabled={saving || uploading || !formData.name.trim()} className="flex-1">
               {saving ? '保存中...' : '保存'}
             </Button>
           </div>
