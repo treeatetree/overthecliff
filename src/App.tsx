@@ -11,6 +11,7 @@ import Contacts from "./pages/Contacts";
 import Events from "./pages/Events";
 import Assistant from "./pages/Assistant";
 import Profile from "./pages/Profile";
+import Install from "./pages/Install";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
               <Route path="/events" element={<Events />} />
               <Route path="/assistant" element={<Assistant />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/install" element={<Install />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>
